@@ -58,6 +58,7 @@ initializeConfig();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+console.log(`🔧 Using PORT: ${PORT} (from env: ${process.env.PORT})`);
 
 // Configure CORS for production
 const corsOptions = {
