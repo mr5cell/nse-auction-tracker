@@ -160,8 +160,14 @@ class KiteAutoAuth {
         expiresAt: this.tokenExpiry.toISOString()
       };
       
-      const tokenFile = path.join(__dirname, '..', '.token_cache.json');
-      fs.writeFileSync(tokenFile, JSON.stringify(tokenData, null, 2));
+      // Try to cache token (skip if filesystem is read-only)
+      try {
+        const tokenFile = path.join(__dirname, '..', '.token_cache.json');
+        fs.writeFileSync(tokenFile, JSON.stringify(tokenData, null, 2));
+        console.log('✅ Token cached successfully');
+      } catch (cacheError) {
+        console.log('⚠️ Cannot cache token (read-only filesystem), continuing without cache');
+      }
       
       return session.access_token;
       
