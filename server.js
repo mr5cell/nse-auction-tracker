@@ -478,7 +478,7 @@ app.get('/api/initialize', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   const isProduction = process.env.NODE_ENV === 'production';
   console.log(`🚀 NSE Auction Tracker running on port ${PORT}`);
   
