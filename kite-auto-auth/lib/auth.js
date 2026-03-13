@@ -10,14 +10,20 @@ puppeteer.use(StealthPlugin());
 
 class KiteAutoAuth {
   constructor(configPath = null) {
-    // Load config from file
-    const configFile = configPath || path.join(__dirname, '..', 'config.json');
-    
-    if (!fs.existsSync(configFile)) {
-      throw new Error(`Config file not found at ${configFile}. Please create it from config.example.json`);
+    // Check if config is available globally (for production environments)
+    if (global.kiteConfig) {
+      console.log('Using global config from environment variables');
+      this.config = global.kiteConfig;
+    } else {
+      // Load config from file
+      const configFile = configPath || path.join(__dirname, '..', 'config.json');
+      
+      if (!fs.existsSync(configFile)) {
+        throw new Error(`Config file not found at ${configFile}. Please create it from config.example.json`);
+      }
+      
+      this.config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
     }
-    
-    this.config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
     
     // Validate config
     const required = ['username', 'password', 'totpSecret', 'apiKey', 'apiSecret'];

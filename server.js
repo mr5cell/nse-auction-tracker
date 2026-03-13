@@ -31,10 +31,23 @@ function initializeConfig() {
       }
     }
 
-    // Create config.json for kite-auto-auth
-    const configPath = path.join(__dirname, 'kite-auto-auth', 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('Created config.json from environment variables');
+    // Try to create config.json, but don't fail if we can't write to filesystem
+    try {
+      const configPath = path.join(__dirname, 'kite-auto-auth', 'config.json');
+      
+      // Ensure directory exists
+      const configDir = path.dirname(configPath);
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+      }
+      
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      console.log('Created config.json from environment variables');
+    } catch (writeError) {
+      console.log('Cannot write config.json (read-only filesystem), using environment variables directly');
+      // Store config globally for kite-auto-auth to use
+      global.kiteConfig = config;
+    }
   } else {
     console.log('Using existing config.json file');
   }
