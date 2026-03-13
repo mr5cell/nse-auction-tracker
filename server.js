@@ -211,12 +211,19 @@ function setupWebSocket() {
 
 // API Endpoints
 app.get('/api/status', (req, res) => {
-  res.json({
-    authenticated: !!accessToken,
-    auctionInstruments: auctionInstruments.length,
-    normalInstruments: normalInstruments.length,
-    websocketConnected: ticker && ticker.connected
-  });
+  try {
+    res.json({
+      authenticated: !!accessToken,
+      auctionInstruments: auctionInstruments?.length || 0,
+      normalInstruments: normalInstruments?.length || 0,
+      websocketConnected: ticker && ticker.connected,
+      timestamp: new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ error: 'Health check failed', message: error.message });
+  }
 });
 
 // Test auction quotes endpoint
