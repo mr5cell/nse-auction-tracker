@@ -64,16 +64,25 @@ class KiteAutoAuth {
     let browser = null;
     
     try {
-      // Launch browser
+      console.log('🚀 Launching Puppeteer browser...');
+      // Launch browser with Railway-specific configuration
       browser = await puppeteer.launch({
         headless: headless ? 'new' : false,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-blink-features=AutomationControlled'
-        ]
+          '--disable-blink-features=AutomationControlled',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-ipc-flooding-protection'
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
       });
+      console.log('✅ Puppeteer browser launched successfully');
       
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -157,7 +166,23 @@ class KiteAutoAuth {
       return session.access_token;
       
     } catch (error) {
-      console.error('Login failed:', error.message);
+      console.error('❌ Kite authentication failed:', error.message);
+      console.error('Full error:', error);
+      
+      // Check if it's a Puppeteer launch error
+      if (error.message.includes('Failed to launch') || error.message.includes('spawn')) {
+        console.error('🚨 Puppeteer launch error - Chromium may not be available in container');
+        try {
+          const execPath = puppeteer.executablePath();
+          console.error('Environment check:', {
+            NODE_ENV: process.env.NODE_ENV,
+            PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
+            puppeteerExecPath: execPath
+          });
+        } catch (e) {
+          console.error('Cannot get Puppeteer executable path:', e.message);
+        }
+      }
       
       // Take screenshot for debugging if browser is open
       if (browser) {
@@ -171,7 +196,11 @@ class KiteAutoAuth {
           // Ignore screenshot errors
         }
         
-        await browser.close();
+        try {
+          await browser.close();
+        } catch (e) {
+          console.error('Error closing browser:', e.message);
+        }
       }
       
       throw error;
