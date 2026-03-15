@@ -227,6 +227,72 @@
       padding: 40px;
       color: #9b9b9b;
     }
+    
+    /* Market status banner - Zerodha style */
+    .market-banner {
+      background: #f7f7f7;
+      border: 1px solid #e0e0e0;
+      padding: 15px 20px;
+      margin-bottom: 20px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #424242;
+    }
+    
+    .market-banner.closed {
+      background: #fff5f5;
+      border-color: #e84855;
+      color: #e84855;
+    }
+    
+    .market-banner.waiting {
+      background: #fffbf0;
+      border-color: #f57e00;
+      color: #f57e00;
+    }
+    
+    .market-banner.live {
+      background: #f0fdf4;
+      border-color: #4caf50;
+      color: #4caf50;
+    }
+    
+    .banner-content {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .banner-icon {
+      font-size: 20px;
+    }
+    
+    .banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .banner-title {
+      font-weight: 500;
+      font-size: 14px;
+      margin: 0;
+    }
+    
+    .banner-message {
+      font-size: 12px;
+      color: #9b9b9b;
+      margin: 0;
+    }
+    
+    .banner-countdown {
+      font-size: 16px;
+      font-weight: 500;
+      font-family: 'Inter', monospace;
+    }
 
     .spinner {
       display: inline-block;
@@ -296,6 +362,18 @@
     <div class="page-header">
       <h1>Auction markets</h1>
       <p class="subtitle">Monitor price differences of stocks between the normal and auction session. You can sell stocks in auctions session to realise small profits. </p>
+    </div>
+    
+    <!-- Market Status Banner -->
+    <div id="market-banner" class="market-banner" style="display: none;">
+      <div class="banner-content">
+        <span class="banner-icon" id="banner-icon"></span>
+        <div class="banner-text">
+          <div class="banner-title" id="banner-title"></div>
+          <div class="banner-message" id="banner-message"></div>
+        </div>
+      </div>
+      <div class="banner-countdown" id="banner-countdown"></div>
     </div>
 
     <!-- Status Bar -->
@@ -381,10 +459,50 @@
 
   <script>
     let refreshInterval = null;
+    let countdownInterval = null;
     let isInitialized = false;
     let allAuctionData = [];
     let filteredData = [];
     let currentSort = { field: 'percentDiff', direction: 'desc' };
+    let currentMarketStatus = null;
+    
+    // Time utilities for frontend
+    function getISTTime() {
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+      const istTime = new Date(utcTime + istOffset);
+      
+      return {
+        date: istTime,
+        hours: istTime.getHours(),
+        minutes: istTime.getMinutes(),
+        seconds: istTime.getSeconds()
+      };
+    }
+    
+    // Format countdown timer
+    function formatCountdownTimer(targetHour, targetMinute) {
+      const ist = getISTTime();
+      const now = new Date(ist.date);
+      const target = new Date(ist.date);
+      target.setHours(targetHour, targetMinute, 0, 0);
+      
+      // If target time has passed today, set it for tomorrow
+      if (now > target) {
+        target.setDate(target.getDate() + 1);
+      }
+      
+      const diff = target - now;
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      if (hours > 0) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
 
     // Format number to Indian format with lakhs/crores
     function formatIndianNumber(num) {
@@ -430,6 +548,17 @@
 
     // Initialize connection
     async function initialize() {
+      // First check market status
+      await fetchMarketStatus();
+      
+      // Check if market is in appropriate state
+      if (currentMarketStatus && 
+          currentMarketStatus.status !== 'WAITING' && 
+          currentMarketStatus.status !== 'LIVE') {
+        alert(`Cannot initialize: ${currentMarketStatus.message}. Next session: ${currentMarketStatus.nextOpen || 'Tomorrow 2:30 PM'}`);
+        return;
+      }
+      
       const btn = document.getElementById('init-btn');
       btn.disabled = true;
       btn.textContent = 'Initializing...';
@@ -597,21 +726,157 @@
         currentHeader.className = `sortable sort-${currentSort.direction}`;
       }
     }
-
-    // Start auto-refresh
-    function startAutoRefresh() {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
+    
+    // Fetch market status from backend
+    async function fetchMarketStatus() {
+      try {
+        const response = await fetch('/api/market-status');
+        const status = await response.json();
+        currentMarketStatus = status;
+        updateMarketBanner(status);
+        return status;
+      } catch (error) {
+        console.error('Failed to fetch market status:', error);
+        return null;
+      }
+    }
+    
+    // Update market banner based on status
+    function updateMarketBanner(status) {
+      if (!status) return;
+      
+      const banner = document.getElementById('market-banner');
+      const bannerIcon = document.getElementById('banner-icon');
+      const bannerTitle = document.getElementById('banner-title');
+      const bannerCountdown = document.getElementById('banner-countdown');
+      const bannerMessage = document.getElementById('banner-message');
+      
+      // Clear old classes
+      banner.className = 'market-banner';
+      
+      // Update based on status
+      switch(status.status) {
+        case 'WAITING':
+          banner.classList.add('waiting');
+          bannerIcon.textContent = '⏰';
+          bannerTitle.textContent = 'Auction market opens at 2:30 PM IST';
+          bannerMessage.textContent = 'The auction session will begin soon';
+          startCountdown(14, 30); // 2:30 PM
+          banner.style.display = 'flex';
+          
+          // Disable initialize button
+          const initBtn = document.getElementById('init-btn');
+          if (initBtn) {
+            initBtn.disabled = true;
+            initBtn.textContent = 'Waiting for Market';
+          }
+          break;
+          
+        case 'LIVE':
+          banner.classList.add('live');
+          bannerIcon.textContent = '•';
+          bannerTitle.textContent = 'Auction market is LIVE';
+          bannerMessage.textContent = 'Market closes at 3:00 PM IST';
+          startCountdown(15, 0); // 3:00 PM
+          banner.style.display = 'flex';
+          
+          // Auto-initialize if not initialized
+          if (!isInitialized && status.dataAvailable) {
+            console.log('Market is live, auto-refreshing data...');
+            refreshData();
+          }
+          break;
+          
+        case 'CLOSED':
+          banner.classList.add('closed');
+          bannerIcon.textContent = '•';
+          bannerTitle.textContent = 'Auction market closed';
+          bannerCountdown.textContent = '';
+          bannerMessage.textContent = `Next session: ${status.nextOpen || 'Tomorrow 2:30 PM IST'}`;
+          banner.style.display = 'flex';
+          stopCountdown();
+          break;
+          
+        case 'SHOWING_PREVIOUS':
+          banner.classList.add('closed');
+          bannerIcon.textContent = '📊';
+          bannerTitle.textContent = "Yesterday's auction data";
+          bannerCountdown.textContent = '';
+          bannerMessage.textContent = 'Data will be cleared at 9:00 AM IST';
+          banner.style.display = 'flex';
+          stopCountdown();
+          break;
+          
+        default:
+          banner.style.display = 'none';
       }
       
-      // Refresh every 2 seconds
-      refreshInterval = setInterval(() => {
-        refreshData();
-      }, 2000);
+      // Update status text
+      const statusText = document.getElementById('market-status-text');
+      if (statusText) {
+        statusText.textContent = status.message || '';
+      }
+      
+      // Adjust refresh rate based on market status
+      adjustRefreshRate(status);
+    }
+    
+    // Start countdown timer
+    function startCountdown(targetHour, targetMinute) {
+      stopCountdown();
+      
+      const updateCountdown = () => {
+        const countdown = formatCountdownTimer(targetHour, targetMinute);
+        const bannerCountdown = document.getElementById('banner-countdown');
+        if (bannerCountdown) {
+          bannerCountdown.textContent = countdown;
+        }
+      };
+      
+      updateCountdown();
+      countdownInterval = setInterval(updateCountdown, 1000);
+    }
+    
+    // Stop countdown timer
+    function stopCountdown() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+    }
+    
+    // Adjust refresh rate based on market status
+    function adjustRefreshRate(status) {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+      
+      if (!isInitialized) return;
+      
+      const refreshRate = status.refreshRate || 300000; // Default 5 minutes
+      
+      if (refreshRate > 0) {
+        refreshInterval = setInterval(() => {
+          refreshData();
+        }, refreshRate);
+        
+        console.log(`Refresh rate set to ${refreshRate/1000} seconds`);
+      }
+    }
+
+    // Start auto-refresh (now handled by adjustRefreshRate)
+    function startAutoRefresh() {
+      // Fetch market status which will set appropriate refresh rate
+      fetchMarketStatus();
     }
 
     // Check status on load
     window.addEventListener('load', async () => {
+      // First, check market status
+      await fetchMarketStatus();
+      
+      // Check if already initialized
       try {
         const response = await fetch('/api/status');
         const status = await response.json();
@@ -621,12 +886,24 @@
           isInitialized = true;
           document.getElementById('init-btn').style.display = 'none';
           document.getElementById('refresh-btn').style.display = 'inline-block';
-          startAutoRefresh();
-          refreshData();
+          
+          // Only refresh data if market is appropriate
+          if (currentMarketStatus && 
+              (currentMarketStatus.status === 'LIVE' || 
+               currentMarketStatus.status === 'CLOSED' ||
+               currentMarketStatus.status === 'SHOWING_PREVIOUS')) {
+            refreshData();
+            startAutoRefresh();
+          }
         }
       } catch (error) {
         console.log('Not yet initialized');
       }
+      
+      // Update market status every 30 seconds
+      setInterval(() => {
+        fetchMarketStatus();
+      }, 30000);
 
       // Add search event listener
       document.getElementById('search-input').addEventListener('input', filterData);

@@ -8,6 +8,7 @@ const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
 const KiteAuth = require('./kite-auto-auth');
+const timeUtils = require('./utils/timeUtils');
 
 // Initialize environment variables and create config
 function initializeConfig() {
@@ -80,6 +81,12 @@ let auctionInstruments = [];
 let normalInstruments = [];
 let tickData = {};
 let auctionTickData = {};
+
+// Time management state
+let lastDataClearDate = null;
+let lastAutoInitDate = null;
+let isInitialized = false;
+let marketCheckInterval = null;
 
 // Initialize Kite authentication
 async function initializeAuth() {
@@ -209,6 +216,89 @@ function setupWebSocket() {
   }
 }
 
+// Clear all auction data (called at 9 AM IST)
+function clearAuctionData() {
+  console.log('🧹 Clearing auction data at 9:00 AM IST');
+  
+  // Clear all data
+  auctionInstruments = [];
+  normalInstruments = [];
+  tickData = {};
+  auctionTickData = {};
+  
+  // Disconnect WebSocket if connected
+  if (ticker && ticker.connected) {
+    ticker.disconnect();
+    ticker = null;
+  }
+  
+  // Update clear date
+  lastDataClearDate = new Date();
+  isInitialized = false;
+  
+  console.log('✅ Data cleared successfully');
+}
+
+// Auto-initialize at market open (2:30 PM IST)
+async function autoInitializeAtMarketOpen() {
+  const marketStatus = timeUtils.getMarketStatus();
+  
+  if (marketStatus.status === 'LIVE' && !isInitialized) {
+    console.log('🚀 Auto-initializing at market open (2:30 PM IST)');
+    
+    try {
+      // Initialize authentication if not done
+      if (!accessToken) {
+        await initializeAuth();
+      }
+      
+      // Fetch instruments
+      await fetchAuctionInstruments();
+      await fetchNormalInstruments();
+      
+      // Setup WebSocket for live data
+      if (timeUtils.isAuctionMarketHours()) {
+        setupWebSocket();
+      }
+      
+      isInitialized = true;
+      lastAutoInitDate = new Date();
+      console.log('✅ Auto-initialization complete');
+    } catch (error) {
+      console.error('❌ Auto-initialization failed:', error);
+    }
+  }
+}
+
+// Manage WebSocket based on market hours
+function manageWebSocketConnection() {
+  const isMarketHours = timeUtils.isAuctionMarketHours();
+  
+  if (isMarketHours && isInitialized && (!ticker || !ticker.connected)) {
+    console.log('📈 Market hours detected, connecting WebSocket');
+    setupWebSocket();
+  } else if (!isMarketHours && ticker && ticker.connected) {
+    console.log('📉 Market closed, disconnecting WebSocket');
+    ticker.disconnect();
+  }
+}
+
+// Check market status and perform time-based actions
+function checkMarketStatus() {
+  // Check if we need to clear data at 9 AM
+  if (timeUtils.shouldClearData(lastDataClearDate)) {
+    clearAuctionData();
+  }
+  
+  // Check if we should auto-initialize at 2:30 PM
+  if (timeUtils.shouldAutoInitialize() && !isInitialized) {
+    autoInitializeAtMarketOpen();
+  }
+  
+  // Manage WebSocket connection based on time
+  manageWebSocketConnection();
+}
+
 // API Endpoints
 app.get('/api/status', (req, res) => {
   try {
@@ -223,6 +313,29 @@ app.get('/api/status', (req, res) => {
   } catch (error) {
     console.error('Health check error:', error);
     res.status(500).json({ error: 'Health check failed', message: error.message });
+  }
+});
+
+// Market status endpoint
+app.get('/api/market-status', (req, res) => {
+  try {
+    const marketStatus = timeUtils.getMarketStatus();
+    const refreshRate = timeUtils.getRefreshRate();
+    const istTime = timeUtils.getISTTime();
+    
+    res.json({
+      ...marketStatus,
+      currentTime: istTime.formatted,
+      isWeekday: timeUtils.isWeekday(),
+      isAuctionHours: timeUtils.isAuctionMarketHours(),
+      refreshRate: refreshRate,
+      dataAvailable: auctionInstruments.length > 0,
+      lastDataClear: lastDataClearDate,
+      isInitialized: isInitialized
+    });
+  } catch (error) {
+    console.error('Market status error:', error);
+    res.status(500).json({ error: 'Failed to get market status' });
   }
 });
 
@@ -468,16 +581,37 @@ app.get('/api/auction-data', async (req, res) => {
 
 app.get('/api/initialize', async (req, res) => {
   try {
-    const authSuccess = await initializeAuth();
-    if (!authSuccess) {
-      return res.status(401).json({ error: 'Authentication failed' });
+    // Check market status
+    const marketStatus = timeUtils.getMarketStatus();
+    
+    // Allow initialization only during market hours or just before
+    if (marketStatus.status === 'WAITING' || marketStatus.status === 'LIVE') {
+      const authSuccess = await initializeAuth();
+      if (!authSuccess) {
+        return res.status(401).json({ error: 'Authentication failed' });
+      }
+
+      await fetchAuctionInstruments();
+      await fetchNormalInstruments();
+      
+      // Only setup WebSocket during market hours
+      if (timeUtils.isAuctionMarketHours()) {
+        setupWebSocket();
+      }
+
+      isInitialized = true;
+      res.json({ 
+        success: true, 
+        message: 'Initialization complete',
+        marketStatus: marketStatus.status
+      });
+    } else {
+      res.status(400).json({ 
+        error: 'Market is closed',
+        message: marketStatus.message,
+        nextOpen: marketStatus.nextOpen || marketStatus.nextEvent
+      });
     }
-
-    await fetchAuctionInstruments();
-    await fetchNormalInstruments();
-    setupWebSocket();
-
-    res.json({ success: true, message: 'Initialization complete' });
   } catch (error) {
     console.error('Initialization error:', error);
     res.status(500).json({ error: error.message });
@@ -495,4 +629,16 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🛠  Development mode - Open http://localhost:${PORT} in your browser`);
     console.log('📱 Click "Initialize" button to start authentication');
   }
+  
+  // Start market status checker (runs every minute)
+  marketCheckInterval = setInterval(() => {
+    checkMarketStatus();
+  }, 60000); // Check every minute
+  
+  // Initial market status check
+  checkMarketStatus();
+  
+  // Log current market status
+  const marketStatus = timeUtils.getMarketStatus();
+  console.log(`📊 Market Status: ${marketStatus.status} - ${marketStatus.message}`);
 });
