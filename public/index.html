@@ -474,17 +474,7 @@
 
     // Initialize connection
     async function initialize() {
-      // First check market status
-      await fetchMarketStatus();
-      
-      // Check if market is in appropriate state
-      if (currentMarketStatus && 
-          currentMarketStatus.status !== 'WAITING' && 
-          currentMarketStatus.status !== 'LIVE') {
-        alert(`Cannot initialize: ${currentMarketStatus.message}. Next session: ${currentMarketStatus.nextOpen || 'Tomorrow 2:30 PM'}`);
-        return;
-      }
-      
+      // Allow initialization anytime
       const btn = document.getElementById('init-btn');
       btn.disabled = true;
       btn.textContent = 'Initializing...';
@@ -683,11 +673,11 @@
           marketInfo.textContent = 'Auction market opens at 2:30 PM IST';
           startCountdown(14, 30); // 2:30 PM
           
-          // Disable initialize button
+          // Keep initialize button enabled - users can set up anytime
           const initBtn = document.getElementById('init-btn');
-          if (initBtn) {
-            initBtn.disabled = true;
-            initBtn.textContent = 'Waiting for Market';
+          if (initBtn && !isInitialized) {
+            initBtn.disabled = false;
+            initBtn.textContent = 'Initialize';
           }
           break;
           

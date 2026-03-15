@@ -581,37 +581,28 @@ app.get('/api/auction-data', async (req, res) => {
 
 app.get('/api/initialize', async (req, res) => {
   try {
-    // Check market status
-    const marketStatus = timeUtils.getMarketStatus();
-    
-    // Allow initialization only during market hours or just before
-    if (marketStatus.status === 'WAITING' || marketStatus.status === 'LIVE') {
-      const authSuccess = await initializeAuth();
-      if (!authSuccess) {
-        return res.status(401).json({ error: 'Authentication failed' });
-      }
-
-      await fetchAuctionInstruments();
-      await fetchNormalInstruments();
-      
-      // Only setup WebSocket during market hours
-      if (timeUtils.isAuctionMarketHours()) {
-        setupWebSocket();
-      }
-
-      isInitialized = true;
-      res.json({ 
-        success: true, 
-        message: 'Initialization complete',
-        marketStatus: marketStatus.status
-      });
-    } else {
-      res.status(400).json({ 
-        error: 'Market is closed',
-        message: marketStatus.message,
-        nextOpen: marketStatus.nextOpen || marketStatus.nextEvent
-      });
+    // Always allow initialization - users can set up anytime
+    const authSuccess = await initializeAuth();
+    if (!authSuccess) {
+      return res.status(401).json({ error: 'Authentication failed' });
     }
+
+    await fetchAuctionInstruments();
+    await fetchNormalInstruments();
+    
+    // Only setup WebSocket during market hours
+    if (timeUtils.isAuctionMarketHours()) {
+      setupWebSocket();
+    }
+
+    isInitialized = true;
+    
+    const marketStatus = timeUtils.getMarketStatus();
+    res.json({ 
+      success: true, 
+      message: 'Initialization complete',
+      marketStatus: marketStatus.status
+    });
   } catch (error) {
     console.error('Initialization error:', error);
     res.status(500).json({ error: error.message });
