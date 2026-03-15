@@ -228,71 +228,6 @@
       color: #9b9b9b;
     }
     
-    /* Market status banner - Zerodha style */
-    .market-banner {
-      background: #f7f7f7;
-      border: 1px solid #e0e0e0;
-      padding: 15px 20px;
-      margin-bottom: 20px;
-      border-radius: 3px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 14px;
-      color: #424242;
-    }
-    
-    .market-banner.closed {
-      background: #fff5f5;
-      border-color: #e84855;
-      color: #e84855;
-    }
-    
-    .market-banner.waiting {
-      background: #fffbf0;
-      border-color: #f57e00;
-      color: #f57e00;
-    }
-    
-    .market-banner.live {
-      background: #f0fdf4;
-      border-color: #4caf50;
-      color: #4caf50;
-    }
-    
-    .banner-content {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    
-    .banner-icon {
-      font-size: 20px;
-    }
-    
-    .banner-text {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    
-    .banner-title {
-      font-weight: 500;
-      font-size: 14px;
-      margin: 0;
-    }
-    
-    .banner-message {
-      font-size: 12px;
-      color: #9b9b9b;
-      margin: 0;
-    }
-    
-    .banner-countdown {
-      font-size: 16px;
-      font-weight: 500;
-      font-family: 'Inter', monospace;
-    }
 
     .spinner {
       display: inline-block;
@@ -364,28 +299,19 @@
       <p class="subtitle">Monitor price differences of stocks between the normal and auction session. You can sell stocks in auctions session to realise small profits. </p>
     </div>
     
-    <!-- Market Status Banner -->
-    <div id="market-banner" class="market-banner" style="display: none;">
-      <div class="banner-content">
-        <span class="banner-icon" id="banner-icon"></span>
-        <div class="banner-text">
-          <div class="banner-title" id="banner-title"></div>
-          <div class="banner-message" id="banner-message"></div>
-        </div>
-      </div>
-      <div class="banner-countdown" id="banner-countdown"></div>
-    </div>
-
     <!-- Status Bar -->
     <div class="status-bar">
-      <div style="display: flex; gap: 20px; align-items: center;">
-        <div class="status-item" id="market-status" style="display: block;">
-          <span style="color: #9b9b9b; font-size: 13px;">Market Status:</span>
-          <span id="market-status-text" style="font-size: 13px; font-weight: 500;"></span>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; gap: 20px; align-items: center;">
+          <div class="status-item" id="market-status" style="display: block;">
+            <span style="color: #9b9b9b; font-size: 13px;">Market:</span>
+            <span id="market-status-text" style="font-size: 13px; font-weight: 500;"></span>
+            <span id="market-countdown" style="font-size: 13px; font-weight: 500; margin-left: 10px; color: #424242; font-family: 'Inter', monospace;"></span>
+          </div>
         </div>
-      </div>
-      <div style="color: #9b9b9b; font-size: 12px;">
-        Auction market operates between 2.30 - 3.00 PM on all trading days
+        <div id="market-info" style="color: #9b9b9b; font-size: 12px;">
+          Auction market operates between 2:30 - 3:00 PM on all trading days
+        </div>
       </div>
     </div>
 
@@ -741,28 +667,21 @@
       }
     }
     
-    // Update market banner based on status
+    // Update market status in the existing status bar
     function updateMarketBanner(status) {
       if (!status) return;
       
-      const banner = document.getElementById('market-banner');
-      const bannerIcon = document.getElementById('banner-icon');
-      const bannerTitle = document.getElementById('banner-title');
-      const bannerCountdown = document.getElementById('banner-countdown');
-      const bannerMessage = document.getElementById('banner-message');
-      
-      // Clear old classes
-      banner.className = 'market-banner';
+      const statusText = document.getElementById('market-status-text');
+      const marketCountdown = document.getElementById('market-countdown');
+      const marketInfo = document.getElementById('market-info');
       
       // Update based on status
       switch(status.status) {
         case 'WAITING':
-          banner.classList.add('waiting');
-          bannerIcon.textContent = '⏰';
-          bannerTitle.textContent = 'Auction market opens at 2:30 PM IST';
-          bannerMessage.textContent = 'The auction session will begin soon';
+          statusText.textContent = 'Waiting for market open';
+          statusText.style.color = '#f57e00';
+          marketInfo.textContent = 'Auction market opens at 2:30 PM IST';
           startCountdown(14, 30); // 2:30 PM
-          banner.style.display = 'flex';
           
           // Disable initialize button
           const initBtn = document.getElementById('init-btn');
@@ -773,48 +692,44 @@
           break;
           
         case 'LIVE':
-          banner.classList.add('live');
-          bannerIcon.textContent = '•';
-          bannerTitle.textContent = 'Auction market is LIVE';
-          bannerMessage.textContent = 'Market closes at 3:00 PM IST';
+          statusText.textContent = 'LIVE';
+          statusText.style.color = '#4caf50';
+          marketInfo.textContent = 'Auction market closes at 3:00 PM IST';
           startCountdown(15, 0); // 3:00 PM
-          banner.style.display = 'flex';
           
           // Auto-initialize if not initialized
           if (!isInitialized && status.dataAvailable) {
             console.log('Market is live, auto-refreshing data...');
             refreshData();
           }
+          
+          // Enable initialize button if needed
+          const liveBtn = document.getElementById('init-btn');
+          if (liveBtn && !isInitialized) {
+            liveBtn.disabled = false;
+            liveBtn.textContent = 'Initialize';
+          }
           break;
           
         case 'CLOSED':
-          banner.classList.add('closed');
-          bannerIcon.textContent = '•';
-          bannerTitle.textContent = 'Auction market closed';
-          bannerCountdown.textContent = '';
-          bannerMessage.textContent = `Next session: ${status.nextOpen || 'Tomorrow 2:30 PM IST'}`;
-          banner.style.display = 'flex';
+          statusText.textContent = 'CLOSED';
+          statusText.style.color = '#e84855';
+          marketCountdown.textContent = '';
+          marketInfo.textContent = `Next session: ${status.nextOpen || 'Tomorrow 2:30 PM IST'}`;
           stopCountdown();
           break;
           
         case 'SHOWING_PREVIOUS':
-          banner.classList.add('closed');
-          bannerIcon.textContent = '📊';
-          bannerTitle.textContent = "Yesterday's auction data";
-          bannerCountdown.textContent = '';
-          bannerMessage.textContent = 'Data will be cleared at 9:00 AM IST';
-          banner.style.display = 'flex';
+          statusText.textContent = "Yesterday's data";
+          statusText.style.color = '#9b9b9b';
+          marketCountdown.textContent = '';
+          marketInfo.textContent = 'Data will be cleared at 9:00 AM IST';
           stopCountdown();
           break;
           
         default:
-          banner.style.display = 'none';
-      }
-      
-      // Update status text
-      const statusText = document.getElementById('market-status-text');
-      if (statusText) {
-        statusText.textContent = status.message || '';
+          statusText.textContent = status.message || '';
+          statusText.style.color = '#424242';
       }
       
       // Adjust refresh rate based on market status
@@ -827,9 +742,9 @@
       
       const updateCountdown = () => {
         const countdown = formatCountdownTimer(targetHour, targetMinute);
-        const bannerCountdown = document.getElementById('banner-countdown');
-        if (bannerCountdown) {
-          bannerCountdown.textContent = countdown;
+        const marketCountdown = document.getElementById('market-countdown');
+        if (marketCountdown) {
+          marketCountdown.textContent = `(${countdown})`;
         }
       };
       
