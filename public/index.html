@@ -437,12 +437,19 @@
       const absNum = Math.abs(num);
       let result = '';
       
+      // Always show in Lakhs for consistency
       if (absNum >= 10000000) {
-        result = (absNum / 10000000).toFixed(2) + ' Cr';
+        // 1 Cr and above
+        result = '₹' + (absNum / 10000000).toFixed(2) + ' Cr';
       } else if (absNum >= 100000) {
-        result = (absNum / 100000).toFixed(2) + ' L';
+        // 1 Lakh and above  
+        result = '₹' + (absNum / 100000).toFixed(2) + ' L';
+      } else if (absNum >= 1000) {
+        // Between 1K and 1 Lakh - still show in Lakhs for consistency
+        result = '₹' + (absNum / 100000).toFixed(3) + ' L';
       } else {
-        result = absNum.toLocaleString('en-IN');
+        // Below 1000, show as is
+        result = '₹' + absNum.toFixed(2);
       }
       
       return num < 0 ? '-' + result : result;
