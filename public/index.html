@@ -369,7 +369,7 @@
           </div>
           <div>
             <button class="btn" id="init-btn" onclick="initialize()" style="padding: 6px 15px; font-size: 12px;">Initialize</button>
-            <button class="btn" id="refresh-btn" onclick="refreshData()" style="display: none; padding: 6px 15px; font-size: 12px;">Refresh</button>
+            <button class="btn" id="refresh-btn" onclick="refreshData()" style="padding: 6px 15px; font-size: 12px; margin-left: 10px;">Refresh Data</button>
           </div>
         </div>
         
@@ -490,8 +490,11 @@
         if (data.success) {
           isInitialized = true;
           updateStatus(true, 'Connected to Kite');
-          document.getElementById('init-btn').style.display = 'none';
-          document.getElementById('refresh-btn').style.display = 'inline-block';
+          
+          // Update button text to show it's connected
+          const btn = document.getElementById('init-btn');
+          btn.disabled = false;
+          btn.textContent = 'Re-Initialize';
           
           // Start auto-refresh
           startAutoRefresh();
@@ -789,8 +792,12 @@
         if (status.authenticated) {
           updateStatus(true, 'Connected to Kite');
           isInitialized = true;
-          document.getElementById('init-btn').style.display = 'none';
-          document.getElementById('refresh-btn').style.display = 'inline-block';
+          
+          // Update button text but keep it visible
+          const initBtn = document.getElementById('init-btn');
+          if (initBtn) {
+            initBtn.textContent = 'Re-Initialize';
+          }
           
           // Only refresh data if market is appropriate
           if (currentMarketStatus && 
