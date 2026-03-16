@@ -583,8 +583,8 @@ app.get('/api/auction-data', async (req, res) => {
       };
     });
 
-    // Sort by percentage difference (highest first)
-    data.sort((a, b) => Math.abs(b.percentDiff) - Math.abs(a.percentDiff));
+    // Sort alphabetically by symbol
+    data.sort((a, b) => a.symbol.localeCompare(b.symbol));
 
     res.json(data);
   } catch (error) {

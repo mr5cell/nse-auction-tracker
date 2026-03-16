@@ -336,7 +336,7 @@
       <table id="auction-table" style="display: none;">
         <thead>
           <tr>
-            <th class="sortable" data-sort="symbol">Symbol</th>
+            <th class="sortable sort-asc" data-sort="symbol">Symbol</th>
             <th class="sortable" data-sort="quantity" style="text-align: right;">Auction Qty</th>
             <th class="sortable" data-sort="auctionValue" style="text-align: right;">Auction Value</th>
             <th class="sortable" data-sort="auctionBestBid" style="text-align: right;">Best Bid</th>
@@ -389,7 +389,7 @@
     let isInitialized = false;
     let allAuctionData = [];
     let filteredData = [];
-    let currentSort = { field: 'percentDiff', direction: 'desc' };
+    let currentSort = { field: 'symbol', direction: 'asc' };
     let currentMarketStatus = null;
     
     // Time utilities for frontend
