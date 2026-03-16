@@ -533,6 +533,20 @@ app.get('/api/auction-data', async (req, res) => {
         }
       }
       
+      // Debug logging for YESBANK
+      if (auctionInst.tradingsymbol === 'YESBANK') {
+        console.log('YESBANK Auction Data:', {
+          symbol: auctionInst.tradingsymbol,
+          auctionInst_token: auctionInst.instrument_token,
+          auctionTick_exists: !!auctionTick,
+          has_depth: !!auctionTick.depth,
+          first_sell_order: auctionTick.depth?.sell?.[0],
+          all_sell_orders: auctionTick.depth?.sell?.map(s => ({price: s.price, qty: s.quantity})),
+          calculated_auctionBestOffer: auctionBestOffer,
+          tick_last_price: auctionTick.last_price
+        });
+      }
+      
       // If still no offer, fallback to other price sources
       if (auctionBestOffer === 0) {
         auctionBestOffer = auctionTick.last_price || 
