@@ -9,7 +9,6 @@ const cors = require('cors');
 const fs = require('fs');
 const KiteAuth = require('./kite-auto-auth');
 const timeUtils = require('./utils/timeUtils');
-const { fetchAuctionQuantityFile, getAuctionQuantity } = require('./utils/fetchAuctionQuantity');
 
 // Initialize environment variables and create config
 function initializeConfig() {
@@ -82,7 +81,6 @@ let auctionInstruments = [];
 let normalInstruments = [];
 let tickData = {};
 let auctionTickData = {};
-let auctionQuantities = {}; // Store NSE auction quantities
 
 // Time management state
 let lastDataClearDate = null;
@@ -121,12 +119,6 @@ async function fetchAuctionInstruments() {
     }).filter(item => item !== null);
     
     console.log(`Fetched ${auctionInstruments.length} auction instruments`);
-    
-    // Also fetch auction quantities from NSE
-    console.log('Fetching auction quantities from NSE...');
-    auctionQuantities = await fetchAuctionQuantityFile();
-    console.log(`Fetched quantities for ${Object.keys(auctionQuantities).length} symbols from NSE`);
-    
     return auctionInstruments;
   } catch (error) {
     console.error('Error fetching auction instruments:', error);
@@ -541,19 +533,6 @@ app.get('/api/auction-data', async (req, res) => {
         }
       }
       
-      // Debug logging for YESBANK
-      if (auctionInst.tradingsymbol === 'YESBANK') {
-        console.log('YESBANK Auction Data:', {
-          symbol: auctionInst.tradingsymbol,
-          auctionInst_token: auctionInst.instrument_token,
-          auctionTick_exists: !!auctionTick,
-          has_depth: !!auctionTick.depth,
-          first_sell_order: auctionTick.depth?.sell?.[0],
-          all_sell_orders: auctionTick.depth?.sell?.map(s => ({price: s.price, qty: s.quantity})),
-          calculated_auctionBestOffer: auctionBestOffer,
-          tick_last_price: auctionTick.last_price
-        });
-      }
       
       // If still no offer, fallback to other price sources
       if (auctionBestOffer === 0) {
@@ -577,18 +556,17 @@ app.get('/api/auction-data', async (req, res) => {
         percentDiff = ((auctionBestOffer - normalLTP) / normalLTP) * 100;
       }
 
-      // Get auction quantity from NSE file or fallback to max_order_quantity
-      const nseAuctionQuantity = getAuctionQuantity(auctionInst.tradingsymbol, auctionQuantities);
-      const auctionQuantity = nseAuctionQuantity || auctionInst.max_order_quantity || 0;
+      // Get auction quantity from first buy order (exchange's bid)
+      // In auction market, the exchange places a buy order for a fixed quantity
+      let auctionQuantity = 0;
+      if (auctionTick.depth?.buy && auctionTick.depth.buy[0]) {
+        // Sum up all buy orders (sometimes split across multiple orders)
+        auctionQuantity = auctionTick.depth.buy.reduce((sum, order) => sum + (order.quantity || 0), 0);
+      }
       
-      // Debug log for YESBANK
-      if (auctionInst.tradingsymbol === 'YESBANK') {
-        console.log('YESBANK Quantity Debug:', {
-          nseAuctionQuantity,
-          max_order_quantity: auctionInst.max_order_quantity,
-          finalAuctionQuantity: auctionQuantity,
-          auctionQuantitiesKeys: Object.keys(auctionQuantities).slice(0, 5)
-        });
+      // Fallback to max_order_quantity if no depth data
+      if (auctionQuantity === 0) {
+        auctionQuantity = auctionInst.max_order_quantity || 0;
       }
 
       return {

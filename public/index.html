@@ -309,8 +309,14 @@
             <span id="market-countdown" style="font-size: 13px; font-weight: 500; margin-left: 10px; color: #424242; font-family: 'Inter', monospace;"></span>
           </div>
         </div>
-        <div id="market-info" style="color: #9b9b9b; font-size: 12px;">
-          Auction market operates between 2:30 - 3:00 PM on all trading days
+        <div style="display: flex; gap: 20px; align-items: center;">
+          <div id="total-auction-value" style="display: none;">
+            <span style="color: #9b9b9b; font-size: 13px;">Total Auction Value:</span>
+            <span id="total-value-text" style="font-size: 13px; font-weight: 600; color: #424242;"></span>
+          </div>
+          <div id="market-info" style="color: #9b9b9b; font-size: 12px;">
+            Auction market operates between 2:30 - 3:00 PM on all trading days
+          </div>
         </div>
       </div>
     </div>
@@ -563,9 +569,16 @@
         if (data.length === 0) {
           document.getElementById('no-data').style.display = 'block';
           document.getElementById('auction-table').style.display = 'none';
+          document.getElementById('total-auction-value').style.display = 'none';
         } else {
           document.getElementById('no-data').style.display = 'none';
           document.getElementById('auction-table').style.display = 'table';
+          
+          // Calculate and display total auction value
+          const totalValue = data.reduce((sum, item) => sum + (item.auctionValue || 0), 0);
+          const totalValueInCr = totalValue / 10000000;
+          document.getElementById('total-value-text').textContent = `₹${totalValueInCr.toFixed(2)} Cr`;
+          document.getElementById('total-auction-value').style.display = 'block';
           
           // Store data and apply search/sort
           allAuctionData = data;
