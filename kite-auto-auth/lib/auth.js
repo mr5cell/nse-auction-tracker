@@ -176,15 +176,26 @@ class KiteAutoAuth {
       console.error('Full error:', error);
       
       // Check if it's a Puppeteer launch error
-      if (error.message.includes('Failed to launch') || error.message.includes('spawn')) {
+      if (error.message.includes('Failed to launch') || error.message.includes('spawn') || error.message.includes('Chrome')) {
         console.error('🚨 Puppeteer launch error - Chromium may not be available in container');
+        console.error('Error details:', error.message);
         try {
-          const execPath = puppeteer.executablePath();
+          const execPath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
           console.error('Environment check:', {
             NODE_ENV: process.env.NODE_ENV,
             PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
-            puppeteerExecPath: execPath
+            puppeteerExecPath: execPath,
+            platform: process.platform,
+            arch: process.arch
           });
+          
+          // Check if executable exists
+          const fs = require('fs');
+          if (execPath && fs.existsSync(execPath)) {
+            console.error(`✅ Chromium found at: ${execPath}`);
+          } else {
+            console.error(`❌ Chromium NOT found at: ${execPath}`);
+          }
         } catch (e) {
           console.error('Cannot get Puppeteer executable path:', e.message);
         }
