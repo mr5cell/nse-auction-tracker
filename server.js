@@ -92,6 +92,18 @@ let marketCheckInterval = null;
 async function initializeAuth() {
   try {
     console.log('Initializing authentication...');
+    
+    // Ensure global config is set for WebSocket
+    if (!global.kiteConfig && process.env.KITE_API_KEY) {
+      global.kiteConfig = {
+        username: process.env.KITE_USERNAME,
+        password: process.env.KITE_PASSWORD,
+        totpSecret: process.env.KITE_TOTP_SECRET,
+        apiKey: process.env.KITE_API_KEY,
+        apiSecret: process.env.KITE_API_SECRET
+      };
+    }
+    
     accessToken = await KiteAuth.login();
     kite = await KiteAuth.getKite();
     console.log('Authentication successful!');
