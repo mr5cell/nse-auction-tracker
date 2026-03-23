@@ -148,7 +148,8 @@ function setupWebSocket() {
   }
 
   try {
-    const config = require('./kite-auto-auth/config.json');
+    // Use global config if available, otherwise load from file
+    const config = global.kiteConfig || require('./kite-auto-auth/config.json');
     
     // Ensure accessToken is a string
     const tokenString = typeof accessToken === 'object' ? accessToken.access_token : accessToken;
@@ -188,6 +189,7 @@ function setupWebSocket() {
   });
 
   ticker.on('ticks', (ticks) => {
+    console.log(`Received ${ticks.length} ticks`);
     ticks.forEach(tick => {
       const token = tick.instrument_token;
       
@@ -195,9 +197,14 @@ function setupWebSocket() {
       const auctionInst = auctionInstruments.find(inst => inst.instrument_token === token);
       if (auctionInst) {
         auctionTickData[token] = tick;
+        console.log(`Auction tick for ${auctionInst.tradingsymbol}: LTP=${tick.last_price}`);
       } else {
         // Normal market tick
         tickData[token] = tick;
+        const normalInst = normalInstruments.find(inst => inst.instrument_token === token);
+        if (normalInst) {
+          console.log(`Normal tick for ${normalInst.tradingsymbol}: LTP=${tick.last_price}`);
+        }
       }
     });
   });
