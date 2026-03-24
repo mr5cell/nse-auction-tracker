@@ -575,17 +575,12 @@ app.get('/api/auction-data', async (req, res) => {
         percentDiff = ((auctionBestOffer - normalLTP) / normalLTP) * 100;
       }
 
-      // Get auction quantity from first buy order (exchange's bid)
-      // In auction market, the exchange places a buy order for a fixed quantity
+      // Get auction quantity from buy orders (these are the bids in auction)
+      // In auction market, participants place buy orders to bid for shares
       let auctionQuantity = 0;
-      if (auctionTick.depth?.buy && auctionTick.depth.buy[0]) {
-        // Sum up all buy orders (sometimes split across multiple orders)
+      if (auctionTick.depth?.buy) {
+        // Sum up all buy orders (these are the actual bids)
         auctionQuantity = auctionTick.depth.buy.reduce((sum, order) => sum + (order.quantity || 0), 0);
-      }
-      
-      // Fallback to max_order_quantity if no depth data
-      if (auctionQuantity === 0) {
-        auctionQuantity = auctionInst.max_order_quantity || 0;
       }
 
       return {
